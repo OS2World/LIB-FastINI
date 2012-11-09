@@ -1,0 +1,30 @@
+;----------------------------------------------------------------------------
+;     MODULE NAME:   FASTINI.DEF
+;
+;         $Author:   Dennis_Bareis  $
+;       $Revision:   1.0  $
+;           $Date:   28 May 1998 18:25:56  $
+;        $Logfile:   E:/DB/PVCS.IT/OS2/FASTINI/FASTINI.DEV  $
+;
+;     DESCRIPTION:   Fast INI file access using SysIni.
+;     2010-11-2 - Released as Open Source under the GNU GPL License.
+;----------------------------------------------------------------------------
+;
+;
+LIBRARY  FASTINI  INITINSTANCE TERMINSTANCE
+;
+DESCRIPTION 'Fast SysIni() access for REXX DLL (Copyright Dennis Bareis 1998, All Rights Reserved (http://www.ozemail.com.au/~dbareis, db0@anz.com)'
+PROTMODE
+DATA MULTIPLE NONSHARED
+STACKSIZE     32768
+;
+EXPORTS
+        ;--- In "FASTINI.C" ------------------------------------------------
+        FastIniVersion
+        FastIniStart
+        FastIniEnd
+
+
+
+
+

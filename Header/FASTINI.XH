@@ -1,0 +1,174 @@
+;----------------------------------------------------------------------------
+;    MODULE NAME:   FASTINI.XH
+;
+;        $Author:   Dennis  $
+;      $Revision:   1.0  $
+;          $Date:   13 Nov 2000 18:11:16  $
+;       $Logfile:   C:/DBAREIS/Projects.PVCS/MultiOs/rexxhdr/FASTINI.XH.pvcs  $
+;         SOURCE:   http://dennisbareis.com/ 
+;
+;    DESCRIPTION:   This code is designed to interface with FASTINI.DLL
+;                   which greatly speeds up access to INI files made with
+;                   the standard rexx "SysIni()" calls.
+;
+;                   The code has been designed to "work" even if the
+;                   DLL is unavailable for some reason.  This makes it
+;                   fairly easy to slot the code in.
+;
+;                   Note that it is highly recommended that you call
+;                   "FastIniCleanup()" prior to exiting your rexx code,
+;                   particularly in case of traps which you should trap.
+;
+;             Released as Open Source Software under the GNU GPL license.
+;----------------------------------------------------------------------------
+
+
+/*---------------------------------------------------------------------------*/
+/*--- Only Load once --------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+#ifndef HEADER_FASTINI_XH
+        #define HEADER_FASTINI_XH    98.147
+
+/*
+ * FASTINI.XH Version <$HEADER_FASTINI_XH> by Dennis Bareis
+ *            http://www.labyrinth.net.au/~dbareis/index.htm (db0@anz.com)
+ */
+
+/*--- FastIni Initializations -----------------------------------------------*/
+_FiOpenCount = 0;
+call RxFuncAdd  'FastIniStart',   'FastIni',  'FastIniStart';
+call RxFuncAdd  'FastIniEnd',     'FastIni',  'FastIniEnd';
+call RxFuncAdd  'FastIniVersion', 'FastIni',  'FastIniVersion';
+
+/*--- Make sure we can access routines (DLL in libpath etc?) ----------------*/
+_fiAvailable = _FastIniOk();
+
+/*--- skip over subroutine --------------------------------------------------*/
+signal  EndFASTINIXh;
+
+
+/*===========================================================================*/
+FastIniIsFast:
+/*                                                                           */
+/*  Returns:  Y = FASTINI.DLL code is being used.                            */
+/*            N = FASTINI.DLL unavailable (no performance boost).            */
+/*===========================================================================*/
+   return(_fiAvailable);
+
+
+
+/*===========================================================================*/
+FastIniOpenIni:
+/*                                                                           */
+/* Call this routine to FAST open an INI file.                               */
+/*===========================================================================*/
+   /*--- Get parameters -----------------------------------------------------*/
+   _fiFile      = arg(1);
+   _fiHandleVar = arg(2);
+
+   /*--- Simply return 'OK' if unavailable as only performance is impacted ---*/
+   if  _fiAvailable = 'N' then
+   do
+       /*--- No access to FASTINI.DLL ---------------------------------------*/
+       interpret _fiHandleVar || ' = 0';       ;;User expects this to get set!
+       return('OK');
+   end;
+
+   /*--- Open the file ------------------------------------------------------*/
+   interpret _fiHandleVar || ' = ""';                 ;;Initialize Handle variable
+   _fiFastRc = FastIniStart(_fiFile, _fiHandleVar);
+
+   /*--- Add to list if we have a handle ------------------------------------*/
+   interpret '_FiHandle = ' || _fiHandleVar;       ;;Get Value of Handle
+   if  _FiHandle <> '' then
+   do
+       /*--- We have a handle so save away ----------------------------------*/
+       _FiOpenCount               = _FiOpenCount + 1;
+       _FiOpenedList._FiOpenCount = _FiHandle;
+   end;
+
+   /*--- Return to caller ---------------------------------------------------*/
+   return(_fiFastRc);
+
+
+
+/*===========================================================================*/
+FastIniCloseIni:
+/*                                                                           */
+/* Call this routine to FAST close an INI file.                              */
+/*===========================================================================*/
+   /*--- Simply return 'OK' if unavailable as only performance is impacted ---*/
+   if  _fiAvailable = 'N' then
+       return('OK');
+
+   /*--- Have Access to routine ---------------------------------------------*/
+   return( FastIniEnd(arg(1)) );    ;;No need to remove from array (safe to close multiple times)
+
+
+/*===========================================================================*/
+FastIniGetVersion:
+/*                                                                           */
+/* Get version information of code being used.                               */
+/*===========================================================================*/
+   /*--- Available? ---------------------------------------------------------*/
+   if  _fiAvailable = 'Y' then
+       return( FastIniVersion(arg(1)) );
+   else
+   do
+       /*--- FASTINI.DLL is unavailable -------------------------------------*/
+       interpret arg(1) || ' = "00.000 http://www.labyrinth.net.au/~dbareis/index.htm db0@anz.com Dennis Bareis"';
+       return('OK');
+   end;
+
+
+/*===========================================================================*/
+FastIniCleanup:
+/*===========================================================================*/
+   /*--- Simply return 'OK' if unavailable as only performance is impacted ---*/
+   if  _fiAvailable = 'N' then
+       return('OK');
+
+   /*--- Close all FAST opened INI files ------------------------------------*/
+   do  _fi = 1 to _FiOpenCount
+       call FastIniEnd(_FiOpenedList._fi);     ;;Close each entry
+       _FiOpenedList._fi = 0;                  ;;Assign to NULLHANDLE (play safe)
+   end;
+   _FiOpenCount = 0;
+   return('OK');
+
+
+
+/*===========================================================================*/
+_FastIniOk:
+/*                                                                           */
+/* None of the rexx 'Rx' functions (add/drop/query) work correctly.  The     */
+/* return code can't be trusted.                                             */
+/*                                                                           */
+/* This routine will return 'Y' if the DLL can be accessed.  It calls one    */
+/* of the known functions.  We have already registered it so if we fail then */
+/* the registration failed.                                                  */
+/*                                                                           */
+/* Note that as this code is within a subroutine the trap handler we set up  */
+/* does not override and set up in the calling code once this routine        */
+/* returns.                                                                  */
+/*===========================================================================*/
+   /*--- Get up trap handler and execute the command ------------------------*/
+   signal on SYNTAX  name _FastIniNotOk;
+   interpret "_fiRc = FastIniVersion('_fiVersion')";
+
+   /*--- We did not die so the function must be available -------------------*/
+   return('Y');
+
+   /*--- We must have died so the function is unavailable -------------------*/
+   _FastIniNotOk:
+   return('N');
+
+
+
+/*---------------------------------------------------------------------------*/
+/*--- End of code -----------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+EndFASTINIXh:
+#endif
+
+
